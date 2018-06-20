@@ -104,10 +104,15 @@ const register = (mobile, code, pwd = '12345678', share = 'ec19c0ca') => {
         })
     }, function (err, _res, body) {
         if (err) throw new Error(err)
-        console.log("注册成功", body);
-        save(`${mobile} ———— ${pwd}`);
+        if (~body.indexOf('注册异常')) {
+            console.log("注册失败", body);
+        } else {
+            console.log("注册成功", body);
+            save(`${mobile} ———— ${pwd}`);
+        }
     })
 };
+
 
 getmobile();
 
