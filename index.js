@@ -7,26 +7,19 @@ var fs = require('fs');
 var path = require('path');
 var os = require('os');
 var proxyList = require('./freeProxySpider.js').proxyList;
+var guss = require('./guss.js');
 
 // 账号
 const user = 'dragon8yima';
-
 // 密码
 const pwd = '202063';
-
-// token
+// 易码API token（可以通过登录接口获取，但实际上只要你不修改密码，这个token是永远有效的）
 const token = '00637696d3e8935e40426aca722249c7a7c60048';
-
 // 项目名
 const itemid = '10438';
+// 邀请码
+const share = 'ec19c0ca'
 
-// 获取ip列表（暂废弃）
-const getiplist = (cb) => {
-    fs.readFile(path.join(__dirname,'/proxys.json'), {encoding:'utf-8'} , function (err, data) {
-        if(err) throw err;
-        cb && cb(JSON.parse(data)[0])
-    });
-}
 
 // 获取结果
 const getData = (str) => ~str.indexOf('|') ? str.split('|')[1] : str
@@ -52,11 +45,14 @@ const getmobile = (proxy_ip) => {
         // 从易码的返回结果中拿到我要的数据
         var mobile = getData(body);
 
+        // 【猴子补丁】
         // 2005错误说明：获取号码数量已达到上限，这是没有及时释放导致的【getsms】获取短信验证码的时候可以释放。
         // 这种情况也比较少，我手动重新获取一下即可。总能等待释放的时候的。
         if (mobile === 2005) {
-            // 递归重新开始
-            getmobile(proxy_ip);
+            // 延迟重新请求
+            setTimeout(function () {
+                getmobile(proxy_ip);
+            }, 1000);
         } else {
             sendsms(mobile, proxy_ip);
         }
@@ -75,7 +71,7 @@ const sendsms = (mobile, proxy_ip) => {
             console.log("拿到到手机号码是", mobile);
             getsms(mobile, proxy_ip)
         } else {
-            console.log("发送短信验证码，", body);
+            console.log("guss发送短信验证码失败", body);
         }
     })
 };
@@ -148,8 +144,10 @@ const register = (proxy_ip, mobile, code, pwd = '12345678', share = 'ec19c0ca') 
 
 proxyList(40, (proxy_ip_list) => {
     console.log('代理已准备就绪，正在开始任务...');
+    var g = new guss(proxy_ip_list[0], token)
+    g.getmobile()
    // for (var i = 0; i < proxy_ip_list.length; i++) {
-   //     getmobile("http://" + proxy_ip_list[i])
+   //     
    // }
 })
 

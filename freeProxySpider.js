@@ -72,7 +72,7 @@ const setProxyList = (limit, cb) => {
     // 从【http://www.66ip.cn/nm.html】中获取免费的ip代理列表
     getProxyList().then(ipList => {
         // 如果ipList为null，说明免费代理服务挂了
-        if (ipList == null) throw new Error("ip列表为空，请稍后再试")
+        if (ipList == null) return console.log("ip列表为空，请稍后再试。", ipList)
         console.log('正在准备ip代理，请稍后...');
         // 获取代理ip列表的长度
         var listCount = ipList.length;
