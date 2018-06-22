@@ -1,34 +1,12 @@
-// npm init -y && npm i request request-promise mkdirp
+// npm init -y && npm i request request-promise mkdirp iconv-lite
 const request = require('request');
-const ipProxyRequest = require('ip-proxy-request')
-var http = require('http')
 var mkdirp = require('mkdirp');
+var iconv = require('iconv-lite');
+var http = require('http')
 var fs = require('fs');
 var path = require('path');
 var os = require('os');
-
-// user-agents
-const userAgents = [
-  'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.8.0.12) Gecko/20070731 Ubuntu/dapper-security Firefox/1.5.0.12',
-  'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0; Acoo Browser; SLCC1; .NET CLR 2.0.50727; Media Center PC 5.0; .NET CLR 3.0.04506)',
-  'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.56 Safari/535.11',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_3) AppleWebKit/535.20 (KHTML, like Gecko) Chrome/19.0.1036.7 Safari/535.20',
-  'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.8) Gecko Fedora/1.9.0.8-1.fc10 Kazehakase/0.5.6',
-  'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/21.0.1180.71 Safari/537.1 LBBROWSER',
-  'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Win64; x64; Trident/5.0; .NET CLR 3.5.30729; .NET CLR 3.0.30729; .NET CLR 2.0.50727; Media Center PC 6.0) ,Lynx/2.8.5rel.1 libwww-FM/2.14 SSL-MM/1.4.1 GNUTLS/1.2.9',
-  'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; .NET CLR 1.1.4322; .NET CLR 2.0.50727)',
-  'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0; SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729; .NET CLR 3.0.30729; Media Center PC 6.0; .NET4.0C; .NET4.0E; QQBrowser/7.0.3698.400)',
-  'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; QQDownload 732; .NET4.0C; .NET4.0E)',
-  'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:2.0b13pre) Gecko/20110307 Firefox/4.0b13pre',
-  'Opera/9.80 (Macintosh; Intel Mac OS X 10.6.8; U; fr) Presto/2.9.168 Version/11.52',
-  'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.8.0.12) Gecko/20070731 Ubuntu/dapper-security Firefox/1.5.0.12',
-  'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0; SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729; .NET CLR 3.0.30729; Media Center PC 6.0; .NET4.0C; .NET4.0E; LBBROWSER)',
-  'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.8) Gecko Fedora/1.9.0.8-1.fc10 Kazehakase/0.5.6',
-  'Mozilla/5.0 (X11; U; Linux; en-US) AppleWebKit/527+ (KHTML, like Gecko, Safari/419.3) Arora/0.6',
-  'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0; SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729; .NET CLR 3.0.30729; Media Center PC 6.0; .NET4.0C; .NET4.0E; QQBrowser/7.0.3698.400)',
-  'Opera/9.25 (Windows NT 5.1; U; en), Lynx/2.8.5rel.1 libwww-FM/2.14 SSL-MM/1.4.1 GNUTLS/1.2.9',
-  'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'
-]
+var proxyList = require('./freeProxySpider.js').proxyList;
 
 // 账号
 const user = 'dragon8yima';
@@ -42,14 +20,13 @@ const token = '00637696d3e8935e40426aca722249c7a7c60048';
 // 项目名
 const itemid = '10438';
 
-// 获取ip列表
+// 获取ip列表（暂废弃）
 const getiplist = (cb) => {
     fs.readFile(path.join(__dirname,'/proxys.json'), {encoding:'utf-8'} , function (err, data) {
         if(err) throw err;
         cb && cb(JSON.parse(data)[0])
     });
 }
-
 
 // 获取结果
 const getData = (str) => ~str.indexOf('|') ? str.split('|')[1] : str
@@ -66,40 +43,50 @@ const save = (txt) => {
 }
 
 // 第一步：获取手机号码
-const getmobile = () => {
+const getmobile = (proxy_ip) => {
     request({
         method: 'GET',
-        uri: `http://api.fxhyd.cn/UserInterface.aspx?action=getmobile&token=${token}&itemid=${itemid}`
+        uri: `http://api.fxhyd.cn/UserInterface.aspx?action=getmobile&token=${token}&itemid=${itemid}`,
     }, function (err, _res, body) {
         if (err) throw new Error(err)
+        // 从易码的返回结果中拿到我要的数据
         var mobile = getData(body);
-        sendsms(mobile);
+
+        // 2005错误说明：获取号码数量已达到上限，这是没有及时释放导致的【getsms】获取短信验证码的时候可以释放。
+        // 这种情况也比较少，我手动重新获取一下即可。总能等待释放的时候的。
+        if (mobile === 2005) {
+            // 递归重新开始
+            getmobile(proxy_ip);
+        } else {
+            sendsms(mobile, proxy_ip);
+        }
     })
 };
 
 // 第二步：发送短信验证码
-const sendsms = (mobile) => {
+const sendsms = (mobile, proxy_ip) => {
     request({
         method: 'GET',
-        uri: `http://guss.one/api/api/user/getCode?phone=${mobile}&_=${mobile}`
+        uri: `http://guss.one/api/api/user/getCode?phone=${mobile}&_=${mobile}`,
+        proxy: proxy_ip,
     }, function (err, _res, body) {
         if (err) throw new Error(err)
         if (~body.indexOf('发送成功')) {
             console.log("拿到到手机号码是", mobile);
-            getsms(mobile)
+            getsms(mobile, proxy_ip)
         } else {
-            console.log("失败了，", body);
+            console.log("发送短信验证码，", body);
         }
     })
 };
 
 // 第三步：获取短信验证码
-const getsms = (mobile) => {
+const getsms = (mobile, proxy_ip) => {
     var count = 0
     var _getsms = function () {
         request({
             method: 'GET',
-            uri: `http://api.fxhyd.cn/UserInterface.aspx?action=getsms&token=${token}&itemid=${itemid}&mobile=${mobile}&release=1`
+            uri: `http://api.fxhyd.cn/UserInterface.aspx?action=getsms&token=${token}&itemid=${itemid}&mobile=${mobile}&release=1`,
         }, function (err, _res, body) {
             if (err) throw new Error(err)
             // 如果短信未收到
@@ -110,11 +97,13 @@ const getsms = (mobile) => {
                     console.log("短信未收到，正在重新获取...", count);
                     _getsms()
                 }, 5000);
+            } else if (count >= 60) {
+                throw new Error('获取短信超时' + mobile)
             } else {
                 // 截取验证码
                 var code = body.match(/\d{4,}/)[0]
                 console.log("获取了验证码", code);
-                register(mobile, code)
+                register(proxy_ip, mobile, code)
             }
         })
     }
@@ -122,78 +111,45 @@ const getsms = (mobile) => {
 };
 
 // 第四步：注册
-const register = (mobile, code, pwd = '12345678', share = 'ec19c0ca') => {
-
-
-    // request({
-    //     method: 'GET',
-    //     url: 'http://ip.chinaz.com/getip.aspx',
-    //     timeout: 8000,
-    //     encoding: null,
-    //     proxy: 'http://91.205.239.120:8080'
-    // }, function (err, _res, body) {
-    //     if (err) throw new Error(err)
-    //     body = body.toString();
-    //     console.log(body);
-    // })
-
-    // request({
-    //     method: 'POST',
-    //     uri: 'http://192.168.0.102',
-    //     headers: {
-    //         'Content-Type': 'application/json',
-    //         'X-Requested-With': 'XMLHttpRequest',
-    //         'User-Agent': userAgents
-    //     },
-    //     proxy: 'http://91.205.239.120:8080',
-    //     timeout: 30000,
-    //     followRedirect: true,
-    //     followAllRedirects: true,
-    //     body: JSON.stringify({
-    //         'Phone': mobile,
-    //         'Code': code,
-    //         'Pwd': pwd,
-    //         'Share': share
-    //     })
-    // }, function (err, _res, body) {
-    //     if (err) throw new Error(err)
-    //     console.log(body);
-    // })
-   
-    // getiplist(ip => {
-        
-        request({
-            method: 'POST',
-            uri: 'http://guss.one/api/api/user/register',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            proxy: 'http://91.205.239.120:8080',
-            timeout: 30000,
-            body: JSON.stringify({
-                'Phone': mobile,
-                'Code': code,
-                'Pwd': pwd,
-                'Share': share
-            })
-        }, function (err, _res, body) {
-            if (err) throw new Error(err)
-            if (~body.indexOf('注册异常') || ~body.indexOf('无效用户')) {
+const register = (proxy_ip, mobile, code, pwd = '12345678', share = 'ec19c0ca') => {
+    request({
+        method: 'POST',
+        uri: 'http://guss.one/api/api/user/register',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        proxy: proxy_ip,
+        timeout: 30000,
+        body: JSON.stringify({
+            'Phone': mobile,
+            'Code': code,
+            'Pwd': pwd,
+            'Share': share
+        })
+    }, function (err, _res, body) {
+        if (err) throw new Error(err.message + proxy_ip);
+        if (~body.indexOf('注册异常') || 
+            ~body.indexOf('无效用户') || 
+            ~body.indexOf('Too Many Requests') || 
+            ~body.indexOf('502 Bad Gateway')) {
                 console.log("注册失败", body);
-            } else {
+        } else {
                 console.log("注册成功", body);
                 save(`${mobile} ———— ${pwd}`);
-            }
-        })
-    // })
+        }
+    })
 };
 
-// for (var i = 0; i < 10; i++) {
-//     getmobile();
-// }
 
+// getmobile('211.159.171.58:80');
 
- getmobile();
+// setProxyList()
 
+proxyList(40, (proxy_ip_list) => {
+    console.log('代理已准备就绪，正在开始任务...');
+   // for (var i = 0; i < proxy_ip_list.length; i++) {
+   //     getmobile("http://" + proxy_ip_list[i])
+   // }
+})
 
