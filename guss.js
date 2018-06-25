@@ -22,6 +22,44 @@ const save = (txt) => {
     })
 }
 
+var YM_Err_Status;
+(function (YM_Err_Status) {
+    YM_Err_Status[YM_Err_Status["1001"] = 1001] = "参数token不能为空";
+    YM_Err_Status[YM_Err_Status["1002"] = 1002] = "参数action不能为空";
+    YM_Err_Status[YM_Err_Status["1003"] = 1003] = "参数action错误";
+    YM_Err_Status[YM_Err_Status["1004"] = 1004] = "token失效";
+    YM_Err_Status[YM_Err_Status["1005"] = 1005] = "用户名或密码错误";
+    YM_Err_Status[YM_Err_Status["1006"] = 1006] = "用户名不能为空";
+    YM_Err_Status[YM_Err_Status["1007"] = 1007] = "密码不能为空";
+    YM_Err_Status[YM_Err_Status["1008"] = 1008] = "账户余额不足";
+    YM_Err_Status[YM_Err_Status["1009"] = 1009] = "账户被禁用";
+    YM_Err_Status[YM_Err_Status["1010"] = 1010] = "参数错误";
+    YM_Err_Status[YM_Err_Status["1011"] = 1011] = "账户待审核";
+    YM_Err_Status[YM_Err_Status["1012"] = 1012] = "登录数达到上限";
+    YM_Err_Status[YM_Err_Status["2001"] = 2001] = "参数itemid不能为空";
+    YM_Err_Status[YM_Err_Status["2002"] = 2002] = "项目不存在";
+    YM_Err_Status[YM_Err_Status["2003"] = 2003] = "项目未启用";
+    YM_Err_Status[YM_Err_Status["2004"] = 2004] = "暂时没有可用的号码";
+    YM_Err_Status[YM_Err_Status["2005"] = 2005] = "获取号码数量已达到上限";
+    YM_Err_Status[YM_Err_Status["2006"] = 2006] = "参数mobile不能为空";
+    YM_Err_Status[YM_Err_Status["2007"] = 2007] = "号码已被释放";
+    YM_Err_Status[YM_Err_Status["2008"] = 2008] = "号码已离线";
+    YM_Err_Status[YM_Err_Status["2009"] = 2009] = "发送内容不能为空";
+    YM_Err_Status[YM_Err_Status["2010"] = 2010] = "号码正在使用中";
+    YM_Err_Status[YM_Err_Status["3001"] = 3001] = "尚未收到短信";
+    YM_Err_Status[YM_Err_Status["3002"] = 3002] = "等待发送";
+    YM_Err_Status[YM_Err_Status["3003"] = 3003] = "正在发送";
+    YM_Err_Status[YM_Err_Status["3004"] = 3004] = "发送失败";
+    YM_Err_Status[YM_Err_Status["3005"] = 3005] = "订单不存在";
+    YM_Err_Status[YM_Err_Status["3006"] = 3006] = "专属通道不存在";
+    YM_Err_Status[YM_Err_Status["3007"] = 3007] = "专属通道未启用";
+    YM_Err_Status[YM_Err_Status["3008"] = 3008] = "专属通道密码与项目不匹配";
+    YM_Err_Status[YM_Err_Status["9001"] = 9001] = "系统错误";
+    YM_Err_Status[YM_Err_Status["9002"] = 9002] = "系统异常";
+    YM_Err_Status[YM_Err_Status["9003"] = 9003] = "系统繁忙";
+})(YM_Err_Status || (YM_Err_Status = {}));
+console.log(YM_Err_Status);
+
 class guss {
 	constructor (ip, token, itemid = '10438', share = "ec19c0ca") {
 		  this.ip = "http://" + ip
@@ -42,12 +80,12 @@ class guss {
 		    var mobile = getData(body);
 
 		    // 【猴子补丁】
-		    // 2005错误说明：获取号码数量已达到上限，这是没有及时释放导致的【getsms】获取短信验证码的时候可以释放。
-		    // 这种情况也比较少，我手动重新获取一下即可。总能等待释放的时候的。
-		    if (mobile === 2005) {
+		    // 如果是4位，则说明返回的是错误码，因为手机号码都是11位的
+		    if (mobile.length === 4) {
 		        // 延迟重新请求
 		        setTimeout(function () {
-		        	console.log('获取手机号码失败(2005)，正在重新获取...');
+		        	// 打印出错误信息，并且尝试重新获取...
+		        	console.log(`获取手机号码失败(${mobile}：${YM_Err_Status[mobile]})，正在重新获取...`);
 		            this.getmobile();
 		        }, 1000);
 		    } else {
@@ -58,7 +96,7 @@ class guss {
 
 	sendsms (mobile) {
 		var count = 0
-		var _sendsms = function () {
+		var _sendsms = () => {
 			request({
 			    method: 'GET',
 			    uri: `http://guss.one/api/api/user/getCode?phone=${mobile}&_=${mobile}`,
@@ -71,11 +109,11 @@ class guss {
 			        this.getsms(mobile)
 			    } else {
 			    	// 最多重新三次
-			    	if (++count > 3) {
+			    	if (++count < 3) {
 				        console.log(`发送短信验证码失败，正在重新获取...${count}`, body);
 				    	_sendsms();
 			        } else {
-			        	throw new Error(`发送短信验证码尝试${count}次后失败...`)
+			        	console.log(`发送短信验证码尝试${count}次后失败...`, body, mobile)
 			        }
 			    }
 			})
