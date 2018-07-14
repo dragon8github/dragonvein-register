@@ -112,6 +112,9 @@ class Dragonvein {
 		    if (err) throw new Error(err)
 		    // 当明文返回'Success'时说明短信发送成功
 		    if (body === 'Success') {
+		    	// 拿到cookie
+		    	this.Cookie = response.headers['set-cookie']
+		    	// 找易通拿短信
 		    	this.getsms()  
 		    } else {
 		    	throw new Error('发送短信失败：' + body)
@@ -155,6 +158,7 @@ class Dragonvein {
 		    uri: 'http://candy.dragonvein.io/frontend/web/site/signup',
 		    headers: {
 		        'Content-Type': 'application/x-www-form-urlencoded',
+		        'Cookie': this.Cookie
 		    },
 		    timeout: 30000,
 		    form: {
