@@ -58,14 +58,12 @@ var YM_Err_Status;
     YM_Err_Status[YM_Err_Status["9002"] = 9002] = "系统异常";
     YM_Err_Status[YM_Err_Status["9003"] = 9003] = "系统繁忙";
 })(YM_Err_Status || (YM_Err_Status = {}));
-console.log(YM_Err_Status);
 
-class guss {
-	constructor (ip, token, itemid = '10438', share = "ec19c0ca") {
-		  this.ip = "http://" + ip
-		  this.share = share
+class Dragonvein {
+	constructor (token, itemid = '20969', _csrf) {
 		  this.token = token
 		  this.itemid = itemid
+		  this._csrf = _csrf
 	}
 
 	// 第一步：获取手机号码
@@ -89,44 +87,44 @@ class guss {
 		            this.getmobile();
 		        }, 1000);
 		    } else {
+		    	// 将从易码拿到的手机号码放入当前实例中
+		    	this.mobile = mobile
+		    	// 拿到手机号码，开始发送短信验证码
 		        this.sendsms(mobile);
 		    }
 		})
 	}
 
-	sendsms (mobile) {
+	sendsms () {
 		var count = 0
-		var _sendsms = () => {
-			request({
-			    method: 'GET',
-			    uri: `http://guss.one/api/api/user/getCode?phone=${mobile}&_=${mobile}`,
-			    proxy: this.ip,
-			}, (err, response, body) => {
-			    if (err) throw new Error(err)
-
-			    if (~body.indexOf('发送成功')) {
-			        console.log("发送短信成功：", mobile);
-			        this.getsms(mobile)
-			    } else {
-			    	// 最多重新三次
-			    	if (++count < 3) {
-				        console.log(`发送短信验证码失败，正在重新获取...${count}`, body);
-				    	_sendsms();
-			        } else {
-			        	console.log(`发送短信验证码尝试${count}次后失败...`, body, mobile)
-			        }
-			    }
-			})
-		}
-		_sendsms()
+		request({
+		    method: 'POST',
+		    uri: `http://candy.dragonvein.io/api/web/v1/sms/send`,
+		    headers: {
+		        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
+		    },
+		    timeout: 30000,
+		    form: {
+		     	_csrf: this._csrf,
+		     	mobile: this.mobile   
+		    }
+		}, (err, response, body) => {
+		    if (err) throw new Error(err)
+		    // 当明文返回'Success'时说明短信发送成功
+		    if (body === 'Success') {
+		    	this.getsms()  
+		    } else {
+		    	throw new Error('发送短信失败：' + body)
+		    }
+		})
 	}
 
-	getsms (mobile) {
-		var count = 0
-		var _getsms = function () {
+	getsms () {
+		var count = 0.
+		var _getsms = () => {
 		    request({
 		        method: 'GET',
-		        uri: `http://api.fxhyd.cn/UserInterface.aspx?action=getsms&token=${this.token}&itemid=${this.itemid}&mobile=${mobile}&release=1`,
+		        uri: `http://api.fxhyd.cn/UserInterface.aspx?action=getsms&token=${this.token}&itemid=${this.itemid}&mobile=${this.mobile}&release=1`,
 		    }, (err, response, body) => {
 		        if (err) throw new Error(err)
 
@@ -139,50 +137,43 @@ class guss {
 		                _getsms()
 		            }, 5000);
 		        } else if (count >= 60) {
-		            throw new Error('获取短信超时：' + mobile)
+		            throw new Error('获取短信超时：' + this.mobile)
 		        } else {
 		            // 截取验证码
 		            var code = body.match(/\d{4,}/)[0]
-		            console.log("获取了验证码", code);
-		            register(mobile, code)
+		            console.log("获取了验证码", code, this.mobile);
+		            this.register(code)
 		        }
 		    })
 		}
 		_getsms();
 	}
 
-	register (mobile, code) {
+	register (code) {
 		request({
 		    method: 'POST',
-		    uri: 'http://guss.one/api/api/user/register',
+		    uri: 'http://candy.dragonvein.io/frontend/web/site/signup',
 		    headers: {
-		        'Content-Type': 'application/json',
-		        'X-Requested-With': 'XMLHttpRequest',
+		        'Content-Type': 'application/x-www-form-urlencoded',
 		    },
-		    proxy: this.ip,
 		    timeout: 30000,
-		    body: JSON.stringify({
-		        'Phone': mobile,
-		        'Code': code,
-		        'Pwd': '12345678',
-		        'Share': this.share
-		    })
-		}, (err, response, body) => {
-		    if (err) throw new Error(err.message + proxy_ip);
-
-		    // 各种tm操蛋的异常错误
-		    if (~body.indexOf('注册异常') || 
-		        ~body.indexOf('无效用户') || 
-		        ~body.indexOf('Too Many Requests') || 
-		        ~body.indexOf('502 Bad Gateway')) {
-		            console.log("注册失败", body);
-		    } else {
-	            console.log("注册成功", body);
-	            save(`${mobile} ———— ${pwd}`);
+		    form: {
+		     	'_csrf': this._csrf,
+		     	'SignupForm[mobile_phone]': this.mobile,
+		     	'SignupForm[sms_code]': code,
+		     	'SignupForm[password]': '123456',
+		     	'SignupForm[upline_invite_code]': '',
+		     	'SignupForm[agreed]': '0',
+		     	'SignupForm[agreed]': '1',
+		     	'signup-button': ''   
 		    }
+		}, (err, response, body) => {
+		    if (err) throw new Error(err.message);
+
+		    console.log("注册成功", body);
 		})
 	}
 }
 
 
-module.exports = guss
+module.exports = Dragonvein
