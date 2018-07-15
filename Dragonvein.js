@@ -123,7 +123,7 @@ class Dragonvein {
 	}
 
 	getsms () {
-		var count = 0.
+		var count = 0
 		var _getsms = () => {
 		    request({
 		        method: 'GET',
